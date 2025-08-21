@@ -3,31 +3,44 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   
-  const { login } = useAuth();
+  const { login, error, clearError } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    clearError();
 
     try {
-      await login(email, password);
-      router.push('/dashboard');
-    } catch (error: any) {
-      setError('Email atau password salah');
+      const success = await login(email, password);
+      if (success) {
+        router.push('/dashboard');
+      }
+    } catch (error) {
+      // Error is handled by useAuth hook
     } finally {
       setLoading(false);
     }
+  };
+
+  // Demo credentials for easy testing
+  const demoCredentials = [
+    { email: 'admin@dico.co.id', password: 'admin123', role: 'Admin' },
+    { email: 'marketing@dico.co.id', password: 'marketing123', role: 'Marketing' },
+    { email: 'demo@dico.co.id', password: 'demo123', role: 'Viewer' }
+  ];
+
+  const fillDemoCredentials = (email: string, password: string) => {
+    setEmail(email);
+    setPassword(password);
   };
 
   return (
@@ -47,8 +60,13 @@ export default function LoginPage() {
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="flex">
+                <AlertCircle className="h-5 w-5 text-red-400" />
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
             </div>
           )}
           
@@ -117,12 +135,24 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Belum punya akun?{' '}
-              <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
-                Daftar di sini
-              </Link>
+          {/* Demo Credentials Section */}
+          <div className="mt-6 p-4 bg-blue-50 rounded-md">
+            <h3 className="text-sm font-medium text-blue-900 mb-2">Demo Credentials:</h3>
+            <div className="space-y-2">
+              {demoCredentials.map((cred, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => fillDemoCredentials(cred.email, cred.password)}
+                  className="block w-full text-left text-xs bg-white border border-blue-200 rounded px-2 py-1 hover:bg-blue-50 transition-colors"
+                >
+                  <span className="font-medium text-blue-900">{cred.role}:</span>{' '}
+                  <span className="text-blue-700">{cred.email}</span> / {cred.password}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-blue-600 mt-2">
+              Klik salah satu untuk mengisi form otomatis
             </p>
           </div>
         </form>
