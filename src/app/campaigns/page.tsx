@@ -45,6 +45,7 @@ export default function CampaignsPage() {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | undefined>();
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deletingCampaign, setDeletingCampaign] = useState(false);
 
   // Check authentication
   React.useEffect(() => {
@@ -70,19 +71,31 @@ export default function CampaignsPage() {
 
   // Handle campaign form submit
   const handleCampaignSave = async (campaignData: Omit<Campaign, 'id'>) => {
-    if (modalMode === 'create') {
-      return await createCampaign(campaignData);
-    } else if (selectedCampaign) {
-      return await updateCampaign(selectedCampaign.id, campaignData);
+    try {
+      if (modalMode === 'create') {
+        return await createCampaign(campaignData);
+      } else if (selectedCampaign) {
+        return await updateCampaign(selectedCampaign.id, campaignData);
+      }
+      return false;
+    } catch (error) {
+      console.error('Error saving campaign:', error);
+      return false;
     }
-    return false;
   };
 
   // Handle campaign delete
   const handleDeleteCampaign = async (campaignId: string) => {
-    const success = await deleteCampaign(campaignId);
-    if (success) {
-      setDeleteConfirm(null);
+    try {
+      setDeletingCampaign(true);
+      const success = await deleteCampaign(campaignId);
+      if (success) {
+        setDeleteConfirm(null);
+      }
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+    } finally {
+      setDeletingCampaign(false);
     }
   };
 
@@ -97,6 +110,13 @@ export default function CampaignsPage() {
     setSelectedCampaign(campaign);
     setModalMode('edit');
     setIsCampaignModalOpen(true);
+  };
+
+  // Close delete modal
+  const closeDeleteModal = () => {
+    if (!deletingCampaign) {
+      setDeleteConfirm(null);
+    }
   };
 
   // Utility functions
@@ -164,7 +184,7 @@ export default function CampaignsPage() {
               placeholder="Search campaigns..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-gray-800 w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           
@@ -172,7 +192,7 @@ export default function CampaignsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-gray-800 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -318,6 +338,7 @@ export default function CampaignsPage() {
                           onClick={() => setDeleteConfirm(campaign.id)}
                           className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                           title="Delete Campaign"
+                          disabled={deletingCampaign}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -340,22 +361,32 @@ export default function CampaignsPage() {
       </div>
 
       {/* Campaign Form Modal */}
-      <CampaignFormModal
-        isOpen={isCampaignModalOpen}
-        onClose={() => setIsCampaignModalOpen(false)}
-        onSave={handleCampaignSave}
-        campaign={selectedCampaign}
-        mode={modalMode}
-      />
+      {isCampaignModalOpen && (
+        <CampaignFormModal
+          isOpen={isCampaignModalOpen}
+          onClose={() => setIsCampaignModalOpen(false)}
+          onSave={handleCampaignSave}
+          campaign={selectedCampaign}
+          mode={modalMode}
+        />
+      )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal - FIXED VERSION */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="fixed inset-0 z-[60] overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            {/* Background overlay - clickable to close */}
+            <div 
+              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75 cursor-pointer" 
+              aria-hidden="true"
+              onClick={closeDeleteModal}
+            ></div>
+
+            {/* This element is to trick the browser into centering the modal contents. */}
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            {/* Modal panel */}
+            <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
@@ -377,14 +408,23 @@ export default function CampaignsPage() {
                 <button
                   type="button"
                   onClick={() => handleDeleteCampaign(deleteConfirm)}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  disabled={deletingCampaign}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Delete
+                  {deletingCampaign ? (
+                    <>
+                      <Loader className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDeleteConfirm(null)}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={closeDeleteModal}
+                  disabled={deletingCampaign}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>

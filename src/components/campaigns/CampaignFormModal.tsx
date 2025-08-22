@@ -11,7 +11,8 @@ interface CampaignFormModalProps {
   mode: 'create' | 'edit';
 }
 
-export default function CampaignFormModalFixed({ 
+// Fix the export name to match import
+export default function CampaignFormModal({ 
   isOpen, 
   onClose, 
   onSave, 
@@ -42,6 +43,7 @@ export default function CampaignFormModalFixed({
     if (!isOpen) return;
     
     if (campaign && mode === 'edit') {
+      console.log('Editing campaign:', campaign); // DEBUG LOG
       setFormData({
         name: campaign.name || '',
         platform: Array.isArray(campaign.platform) ? campaign.platform : [],
@@ -57,6 +59,7 @@ export default function CampaignFormModalFixed({
         targetIndustries: Array.isArray(campaign.targetIndustries) ? campaign.targetIndustries : []
       });
     } else if (mode === 'create') {
+      console.log('Creating new campaign'); // DEBUG LOG
       setFormData({
         name: '',
         platform: [],
@@ -113,6 +116,8 @@ export default function CampaignFormModalFixed({
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     
+    console.log('Validating form data:', formData); // DEBUG LOG
+    
     if (!formData.name?.trim()) newErrors.name = 'Campaign name is required';
     if (!Array.isArray(formData.platform) || formData.platform.length === 0) {
       newErrors.platform = 'At least one platform must be selected';
@@ -131,6 +136,7 @@ export default function CampaignFormModalFixed({
       }
     }
     
+    console.log('Validation errors:', newErrors); // DEBUG LOG
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -139,14 +145,27 @@ export default function CampaignFormModalFixed({
     e.preventDefault();
     e.stopPropagation();
     
-    if (!validateForm()) return;
+    console.log('Form submitted with data:', formData); // DEBUG LOG
+    
+    if (!validateForm()) {
+      console.log('Validation failed, stopping submission'); // DEBUG LOG
+      return;
+    }
     
     setLoading(true);
     
     try {
+      // Clean and validate data before sending
       const campaignData: Omit<Campaign, 'id'> = {
-        ...formData,
+        name: formData.name.trim(),
         platform: Array.isArray(formData.platform) ? formData.platform : [],
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        budget: Number(formData.budget),
+        spent: Number(formData.spent || 0),
+        leads: Number(formData.leads || 0),
+        conversions: Number(formData.conversions || 0),
+        status: formData.status,
         targetProducts: Array.isArray(formData.targetProducts) ? formData.targetProducts : [],
         targetIndustries: Array.isArray(formData.targetIndustries) ? formData.targetIndustries : [],
         productResults: Array.isArray(formData.productResults) && formData.productResults.length > 0 
@@ -159,12 +178,20 @@ export default function CampaignFormModalFixed({
             }))
       };
       
+      console.log('Cleaned campaign data to send:', campaignData); // DEBUG LOG
+      
       const success = await onSave(campaignData);
+      console.log('onSave result:', success); // DEBUG LOG
       
       if (success) {
+        console.log('Campaign saved successfully, closing modal'); // DEBUG LOG
         onClose();
+      } else {
+        console.log('Campaign save failed'); // DEBUG LOG
+        setErrors({ submit: 'Failed to save campaign. Please try again.' });
       }
     } catch (error: any) {
+      console.error('Submit error:', error); // DEBUG LOG
       setErrors({ submit: error.message || 'Failed to save campaign' });
     } finally {
       setLoading(false);
@@ -172,6 +199,7 @@ export default function CampaignFormModalFixed({
   };
 
   const handleInputChange = (field: keyof Omit<Campaign, 'id'>, value: any) => {
+    console.log(`Updating field ${field} with value:`, value); // DEBUG LOG
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -184,6 +212,7 @@ export default function CampaignFormModalFixed({
       ? [...currentPlatforms, platform]
       : currentPlatforms.filter(p => p !== platform);
     
+    console.log('Platform updated:', updatedPlatforms); // DEBUG LOG
     handleInputChange('platform', updatedPlatforms);
   };
 
@@ -193,6 +222,7 @@ export default function CampaignFormModalFixed({
       ? [...currentProducts, product]
       : currentProducts.filter(p => p !== product);
     
+    console.log('Products updated:', updatedProducts); // DEBUG LOG
     handleInputChange('targetProducts', updatedProducts);
   };
 
@@ -274,7 +304,7 @@ export default function CampaignFormModalFixed({
                     type="text"
                     value={formData.name || ''}
                     onChange={(e) => handleInputChange('name', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                    className={`text-gray-800 w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
                       errors.name ? 'border-red-300' : 'border-gray-300'
                     }`}
                     placeholder="e.g., Digital Banking Q4 2024"
@@ -332,7 +362,7 @@ export default function CampaignFormModalFixed({
                           e.stopPropagation();
                           handleInputChange('startDate', e.target.value);
                         }}
-                        className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`text-gray-800 w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
                           errors.startDate ? 'border-red-300' : 'border-gray-300'
                         }`}
                       />
@@ -358,7 +388,7 @@ export default function CampaignFormModalFixed({
                           e.stopPropagation();
                           handleInputChange('endDate', e.target.value);
                         }}
-                        className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`text-gray-800 w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
                           errors.endDate ? 'border-red-300' : 'border-gray-300'
                         }`}
                       />
@@ -386,7 +416,7 @@ export default function CampaignFormModalFixed({
                         e.stopPropagation();
                         handleInputChange('budget', parseInt(e.target.value) || 0);
                       }}
-                      className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                      className={`text-gray-800 w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
                         errors.budget ? 'border-red-300' : 'border-gray-300'
                       }`}
                       placeholder="50000000"

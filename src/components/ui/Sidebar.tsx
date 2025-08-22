@@ -25,7 +25,6 @@ const menuItems = [
   { href: '/analytics', icon: BarChart3, label: 'Analytics', roles: ['admin', 'marketing', 'viewer'] },
   { href: '/campaigns', icon: Target, label: 'Campaigns', roles: ['admin', 'marketing'] },
   { href: '/customers', icon: Users, label: 'Customers', roles: ['admin', 'marketing'] },
-  { href: '/seo', icon: TrendingUp, label: 'SEO Metrics', roles: ['admin', 'marketing', 'viewer'] },
   { href: '/settings', icon: Settings, label: 'Settings', roles: ['admin'] },
 ];
 

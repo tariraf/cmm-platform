@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useRouter } from 'next/navigation';
@@ -25,11 +25,12 @@ import {
   Target,
   Wallet2,
   Trash2,
-  Loader
+  Loader,
+  AlertTriangle
 } from 'lucide-react';
 import { PRODUCT_LABELS, PRODUCT_COLORS, ProductOpportunity, Customer } from '@/types';
 
-export default function CustomersPage() {
+export default function CustomersPageFixed() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   
@@ -52,10 +53,16 @@ export default function CustomersPage() {
   const [isOpportunityModalOpen, setIsOpportunityModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>();
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    customerId: string;
+    customerName: string;
+    isDeleting: boolean;
+  } | null>(null);
 
   // Check authentication
-  React.useEffect(() => {
+  useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
     }
@@ -81,20 +88,62 @@ export default function CustomersPage() {
 
   // Handle customer form submit
   const handleCustomerSave = async (customerData: Omit<Customer, 'id'>) => {
-    if (modalMode === 'create') {
-      return await createCustomer(customerData);
-    } else if (selectedCustomer) {
-      return await updateCustomer(selectedCustomer.id, customerData);
+    try {
+      if (modalMode === 'create') {
+        return await createCustomer(customerData);
+      } else if (selectedCustomer) {
+        return await updateCustomer(selectedCustomer.id, customerData);
+      }
+      return false;
+    } catch (error) {
+      console.error('Error saving customer:', error);
+      return false;
     }
-    return false;
   };
 
-  // Handle customer delete
-  const handleDeleteCustomer = async (customerId: string) => {
-    const success = await deleteCustomer(customerId);
-    if (success) {
-      setDeleteConfirm(null);
+  // Handle delete confirmation
+  const handleDeleteClick = (customer: Customer, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('🗑️ Delete clicked for customer:', customer.companyName);
+    
+    setDeleteConfirm({
+      customerId: customer.id,
+      customerName: customer.companyName,
+      isDeleting: false
+    });
+  };
+
+  // Handle actual deletion
+  const handleDeleteCustomer = async () => {
+    if (!deleteConfirm) return;
+    
+    console.log('🗑️ Confirming delete for customer:', deleteConfirm.customerName);
+    
+    // Set deleting state
+    setDeleteConfirm(prev => prev ? { ...prev, isDeleting: true } : null);
+    
+    try {
+      const success = await deleteCustomer(deleteConfirm.customerId);
+      
+      if (success) {
+        console.log('✅ Customer deleted successfully');
+        setDeleteConfirm(null);
+      } else {
+        console.log('❌ Failed to delete customer');
+        setDeleteConfirm(prev => prev ? { ...prev, isDeleting: false } : null);
+      }
+    } catch (error) {
+      console.error('💥 Error deleting customer:', error);
+      setDeleteConfirm(prev => prev ? { ...prev, isDeleting: false } : null);
     }
+  };
+
+  // Cancel delete
+  const handleCancelDelete = () => {
+    console.log('❌ Delete cancelled');
+    setDeleteConfirm(null);
   };
 
   // Open modals
@@ -104,7 +153,12 @@ export default function CustomersPage() {
     setIsCustomerModalOpen(true);
   };
 
-  const openEditModal = (customer: Customer) => {
+  const openEditModal = (customer: Customer, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('✏️ Edit clicked for customer:', customer.companyName);
+    
     setSelectedCustomer(customer);
     setModalMode('edit');
     setIsCustomerModalOpen(true);
@@ -177,7 +231,7 @@ export default function CustomersPage() {
               placeholder="Search customers..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-gray-800 w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           
@@ -185,7 +239,7 @@ export default function CustomersPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-gray-800 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -196,7 +250,7 @@ export default function CustomersPage() {
             <select
               value={productFilter}
               onChange={(e) => setProductFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-gray-800 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Products</option>
               {Object.entries(PRODUCT_LABELS).map(([key, label]) => (
@@ -354,19 +408,27 @@ export default function CustomersPage() {
                       <td className="py-4 px-6">
                         <div className="flex items-center justify-center space-x-2">
                           <button 
-                            onClick={() => openEditModal(customer)}
+                            onClick={(e) => openEditModal(customer, e)}
                             className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
                             title="Edit Customer"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button 
-                            onClick={() => setDeleteConfirm(customer.id)}
-                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                            title="Delete Customer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {/* Only show delete for admin users */}
+                          {user.role === 'admin' && (
+                            <button 
+                              onClick={(e) => handleDeleteClick(customer, e)}
+                              className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                              title="Delete Customer"
+                              disabled={deleteConfirm?.isDeleting}
+                            >
+                              {deleteConfirm?.customerId === customer.id && deleteConfirm.isDeleting ? (
+                                <Loader className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -399,14 +461,18 @@ export default function CustomersPage() {
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
+            {/* Background overlay */}
+            <div 
+              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+              onClick={!deleteConfirm.isDeleting ? handleCancelDelete : undefined}
+            ></div>
+            
+            {/* Modal */}
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <Trash2 className="h-6 w-6 text-red-600" />
+                    <AlertTriangle className="h-6 w-6 text-red-600" />
                   </div>
                   <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
@@ -414,24 +480,38 @@ export default function CustomersPage() {
                     </h3>
                     <div className="mt-2">
                       <p className="text-sm text-gray-500">
-                        Are you sure you want to delete this customer? This action cannot be undone.
+                        Are you sure you want to delete the customer "<strong>{deleteConfirm.customerName}</strong>"? 
+                        This action cannot be undone and all customer data will be permanently lost.
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
+              
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
-                  onClick={() => handleDeleteCustomer(deleteConfirm)}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={handleDeleteCustomer}
+                  disabled={deleteConfirm.isDeleting}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Delete
+                  {deleteConfirm.isDeleting ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin mr-2" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Customer
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDeleteConfirm(null)}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={handleCancelDelete}
+                  disabled={deleteConfirm.isDeleting}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
                 >
                   Cancel
                 </button>
